@@ -31,6 +31,7 @@ async function inspectBlock(block) {
   const contractAddresses = await Promise.all(contractDeploys.map(addressFromDeploy))
   for (address of contractAddresses) {
     const usedOpcodes = await getOpcodeUsage(address, newOpcodeBytes)
+    if (!usedOpcodes.length) continue
     const opcodeLabels = usedOpcodes.map(byte => newOpcodeNames[byte]).join(', ')
     console.log(`${address}: ${opcodeLabels}`)
   }
