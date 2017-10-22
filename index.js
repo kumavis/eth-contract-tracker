@@ -6,9 +6,9 @@ const binToOps = require('eth-bin-to-ops')
 const byzantiumForkNumber = 4370000
 const newOpcodeNames = {
   'fa': 'STATICCALL',
-  '3d': 'RETURNDATASIZE',
-  '3e': 'RETURNDATACOPY',
-  'fd': 'REVERT',
+  // '3d': 'RETURNDATASIZE',
+  // '3e': 'RETURNDATACOPY',
+  // 'fd': 'REVERT',
 }
 const newOpcodeBytes = Object.keys(newOpcodeNames)
 
