@@ -2,7 +2,8 @@ process.on('unhandledRejection', error => {
   console.log('unhandledRejection', error.message)
 })
 
-const fs = require('fs')
+const appendFile = require('fs').appendFile || console.log
+const async = require('async')
 const pify = require('pify')
 const onStreamEnd = require('end-of-stream')
 const EthRpcClient = require('eth-rpc-client')
@@ -24,51 +25,59 @@ const newOpcodeBytes = Object.keys(newOpcodeNames)
 searchBlockchain({
   network: 'mainnet',
   fromBlock: 4370000,
+  // fromBlock: 4424290,
 })
 
 searchBlockchain({
   network: 'ropsten',
   fromBlock: 1700000,
+  // fromBlock: 1938636,
+  // fromBlock: 1702734,
 })
 
 searchBlockchain({
   network: 'rinkeby',
   fromBlock: 1035301,
+  // fromBlock: 1124150,
 })
 
 
-function searchBlockchain({ fromBlock, network }) {
-  fs.appendFileSync(`./${network}-txs.txt`, `\nstart from #${fromBlock} ${new Date().toDateString()}\n`)
+
+async function searchBlockchain({ fromBlock, network }) {
+  await pify(appendFile)(`./${network}-txs.txt`, `\nstart from #${fromBlock} ${new Date().toDateString()}\n`)
+
+  const rpcUrl = `https://${network}.infura.io`
 
   const { blockTracker } = new EthRpcClient({
+    rpcUrl,
     getAccounts: (cb) => { cb(null, []) },
   })
   // override the provider bc EthRpcClient is broken
   const provider = createZeroClient({
-    rpcUrl: `https://${network}.infura.io`,
+    rpcUrl,
     getAccounts: (cb) => cb(null, []),
   })
 
   const eth = new EthQuery(provider)
 
+  // create a block processor that limits to 10 blocks in parallel
+  const cargo = async.cargo((blocks, cb) => {
+    async.each(blocks, (block, next) => inspectBlockAndWriteResultsToLogs(block).then(next).catch(next), cb)
+  }, 10)
+
   blockTracker.once('block', () => {
     blockTracker.stop()
     blockTracker.start({ fromBlock: `0x${fromBlock.toString(16)}`, })
-    blockTracker.on('block', async (block, cb) => {
-      console.log(`${network} #${parseInt(block.number, 16)}`)
-      cb()
-      try {
-        const matchingTxs = await inspectBlockForEccTxs(block)
-        if (matchingTxs.length) {
-          console.log('found some txs!', matchingTxs)
-          fs.appendFileSync(`./${network}-txs.txt`, JSON.stringify(matchingTxs)+'\n')
-        }
-      } catch (err) {
-        console.error(err)
-      }
-      // cb()
-    })
+    blockTracker.on('block', (block, cb) => cargo.push(block, cb))
   })
+
+  async function inspectBlockAndWriteResultsToLogs(block) {
+    const matchingTxs = await inspectBlockForEccTxs(block)
+    if (matchingTxs.length) {
+      console.log('found some txs!', matchingTxs)
+      await pify(appendFile)(`./${network}-txs.txt`, JSON.stringify(matchingTxs)+'\n')
+    }
+  }
 
   async function inspectBlockForNewOpcodeDeploys(block) {
     const contractDeploys = block.transactions.filter(tx => !tx.to)
@@ -107,9 +116,9 @@ function searchBlockchain({ fromBlock, network }) {
         ].includes(message.toAddress)) {
           didFindSendToPrecompile8 = true
         }
-        // console.log(`${tx.hash}.${message.sequence}: ${message.fromAddress} -> ${message.toAddress}`)
+        console.log(`${network} #${parseInt(block.number, 16)} ${tx.hash}.${message.sequence}: ${message.fromAddress} -> ${message.toAddress}`)
       })
-      await pify(onStreamEnd)(vmStream)
+      await pify(onStreamEnd)(callTraceTransform)
 
       if (didFindSendToPrecompile8) {
         matchingTxs.push(tx.hash)

@@ -1,3 +1,9 @@
+### app specific
+
+mainnet-txs.txt
+rinkeby-txs.txt
+ropsten-txs.txt
+
 
 # Created by https://www.gitignore.io/api/osx,node
 
