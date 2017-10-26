@@ -92,40 +92,42 @@ async function searchBlockchain({ fromBlock, network }) {
   }
 
   async function inspectBlockForEccTxs(block) {
+    console.log(`${network} #${parseInt(block.number, 16)}`)
     const nonContractDeploys = block.transactions.filter(tx => tx.to)
-    const matchingTxs = []
 
-    for (let tx of nonContractDeploys) {
-      const hasPush8 = await hasMatchingPush(tx.to, Buffer.from('08', 'hex'))
-      if (!hasPush8) continue
+    const matchingTxs = await Promise.all(
+      nonContractDeploys.map(async tx => inspectTxForEccAction(block, tx))
+    )
 
-      const vmStream = createVmTraceStream(provider, tx.hash)
-      const callTraceTransform = createCallTraceTransform()
-      vmStream.on('error', console.error)
-      vmStream.pipe(callTraceTransform)
+    return matchingTxs.filter(Boolean)
+  }
 
-      let didFindSendToPrecompile8 = false
+  async function inspectTxForEccAction(block, tx) {
+    const hasPush8 = await hasMatchingPush(tx.to, Buffer.from('08', 'hex'))
+    if (!hasPush8) return
 
-      callTraceTransform.on('data', (event) => {
-        if (event.type !== 'message') return
-        const message = event.data
-        if ([
-          '0x0000000000000000000000000000000000000006',
-          '0x0000000000000000000000000000000000000007',
-          '0x0000000000000000000000000000000000000008',
-        ].includes(message.toAddress)) {
-          didFindSendToPrecompile8 = true
-        }
-        console.log(`${network} #${parseInt(block.number, 16)} ${tx.hash}.${message.sequence}: ${message.fromAddress} -> ${message.toAddress}`)
-      })
-      await pify(onStreamEnd)(callTraceTransform)
+    const vmStream = createVmTraceStream(provider, tx.hash)
+    const callTraceTransform = createCallTraceTransform()
+    vmStream.on('error', console.error)
+    vmStream.pipe(callTraceTransform)
 
-      if (didFindSendToPrecompile8) {
-        matchingTxs.push(tx.hash)
+    let didFindSendToPrecompile8 = false
+
+    callTraceTransform.on('data', (event) => {
+      if (event.type !== 'message') return
+      const message = event.data
+      if ([
+        '0x0000000000000000000000000000000000000006',
+        '0x0000000000000000000000000000000000000007',
+        '0x0000000000000000000000000000000000000008',
+      ].includes(message.toAddress)) {
+        didFindSendToPrecompile8 = true
       }
-    }
+      // console.log(`${network} #${parseInt(block.number, 16)} ${tx.hash}.${message.sequence}: ${message.fromAddress} -> ${message.toAddress}`)
+    })
+    await pify(onStreamEnd)(callTraceTransform)
 
-    return matchingTxs
+    if (didFindSendToPrecompile8) return tx.hash
   }
 
   async function addressFromDeploy(tx) {
