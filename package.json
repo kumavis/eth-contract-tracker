@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",
+    "browser": "beefy index.js"
   },
   "author": "",
   "license": "ISC",
@@ -12,10 +13,14 @@
     "end-of-stream": "^1.4.0",
     "eth-bin-to-ops": "^1.0.1",
     "eth-block-tracker": "^2.2.2",
-    "eth-rpc-client": "^2.0.0",
+    "eth-rpc-client": "^2.0.3",
     "eth-tx-summary": "^3.1.1",
     "ethjs-query": "^0.2.9",
     "pify": "^3.0.0",
     "web3-provider-engine": "^13.3.3"
+  },
+  "devDependencies": {
+    "beefy": "^2.1.8",
+    "browserify": "^14.5.0"
   }
 }
