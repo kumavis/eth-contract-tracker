@@ -51,6 +51,9 @@ async function searchBlockchain({ fromBlock, network }) {
   const { blockTracker } = new EthRpcClient({
     rpcUrl,
     getAccounts: (cb) => { cb(null, []) },
+    blockTracker: {
+      syncingTimeout: Math.Infinity,
+    }
   })
   // override the provider bc EthRpcClient is broken
   const provider = createZeroClient({
@@ -65,11 +68,8 @@ async function searchBlockchain({ fromBlock, network }) {
     async.each(blocks, (block, next) => inspectBlockAndWriteResultsToLogs(block).then(next).catch(next), cb)
   }, 10)
 
-  blockTracker.once('block', () => {
-    blockTracker.stop()
-    blockTracker.start({ fromBlock: `0x${fromBlock.toString(16)}`, })
-    blockTracker.on('block', (block, cb) => cargo.push(block, cb))
-  })
+  blockTracker.start({ fromBlock: `0x${fromBlock.toString(16)}`, })
+  blockTracker.on('block', (block, cb) => cargo.push(block, cb))
 
   async function inspectBlockAndWriteResultsToLogs(block) {
     const matchingTxs = await inspectBlockForEccTxs(block)
