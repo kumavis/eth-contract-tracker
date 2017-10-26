@@ -52,8 +52,8 @@ async function searchBlockchain({ fromBlock, network }) {
     rpcUrl,
     getAccounts: (cb) => { cb(null, []) },
     blockTracker: {
-      syncingTimeout: Math.Infinity,
-    }
+      syncingTimeout: Infinity,
+    },
   })
   // override the provider bc EthRpcClient is broken
   const provider = createZeroClient({
